@@ -29,3 +29,9 @@ class SculpinKernel extends \Sculpin\Bundle\SculpinBundle\HttpKernel\AbstractKer
     }
 }
 ```
+
+## Usage
+
+Files under ``_pages`` are recognized as a Content Type Page.
+
+A Twig variable ``page.menu`` can be loop to automatically generate a menu.
