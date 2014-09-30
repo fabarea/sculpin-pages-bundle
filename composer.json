@@ -6,9 +6,9 @@
     "license": "MIT",
     "authors": [
         {
-            "name": "Marco Vito Moscaritolo",
-            "email": "marco@fab.org",
-            "homepage": "http://www.fab.org"
+            "name": "Fabien Udriot",
+            "email": "fabien@omic.ch",
+            "homepage": "http://fabarea.tk"
         }
     ],
     "require": {

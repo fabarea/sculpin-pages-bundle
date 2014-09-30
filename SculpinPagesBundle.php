@@ -16,7 +16,7 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
 /**
  * Sculpin Pages Bundle.
  *
- * @author Marco Vito Moscaritolo <marco@fab.org>
+ * @author Fabien Udriot <fabien@omic.ch>
  */
 class SculpinPagesBundle extends Bundle
 {

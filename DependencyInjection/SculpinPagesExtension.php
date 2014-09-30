@@ -19,7 +19,7 @@ use Symfony\Component\HttpKernel\DependencyInjection\Extension;
 /**
  * Sculpin Pages Extension.
  *
- * @author Marco Vito Moscaritolo <marco@fab.org>
+ * @author Fabien Udriot <fabien@omic.ch>
  */
 class SculpinPagesExtension extends Extension
 {
