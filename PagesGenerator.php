@@ -13,6 +13,7 @@ namespace Fab\Sculpin\Bundle\PagesBundle;
 
 use Sculpin\Core\Sculpin;
 use Sculpin\Core\Event\SourceSetEvent;
+use Sculpin\Core\Source\SourceSet;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -46,8 +47,6 @@ class PagesGenerator implements EventSubscriberInterface
     {
         $sourceSet = $sourceSetEvent->sourceSet();
 
-//        $this->menu = array(); // reset value
-        $menu = array();
         foreach ($sourceSet->updatedSources() as $source) {
             /** @var \Sculpin\Core\Source\FileSource $source */
 
@@ -56,67 +55,54 @@ class PagesGenerator implements EventSubscriberInterface
                 continue;
             }
 
-            // Only takes pages that can be formatted (AKA *.md)
+            // Only takes pages that can be formatted (AKA *.md) and skip images, CSS, JS, ...
             if ($source->canBeFormatted()) {
 
                 // Dynamically set the permalink.
-                $segments = explode('/', $source->relativePathname());
-                if (!empty($segments)) {
-                    $shifted = array_shift($segments);
+                // $pathSegments corresponds to the file path segment exploded ex: 01-foo/10-bar.md
+                $pathSegments = explode('/', $source->relativePathname());
+                if (!empty($pathSegments)) {
+
+                    // Takes the last part of the segment which corresponds to the file name
+                    $shifted = array_shift($pathSegments);
                     if ($shifted === '_pages') {
 
-                        $slug = $this->getSlug($segments);
-                        $navigationName = $this->getNavigationName($segments);
-                        $permalink = $this->getPermalink($segments);
+                        $slug = $this->getSlug($pathSegments);
+                        $title = $source->data()->get('title');
+                        $permalink = $this->getPermalink($pathSegments);
 
-                        $source->data()->set('nav_name', $navigationName);
                         $source->data()->set('slug', $slug);
-			            $source->data()->set('permalink', $permalink);
+                        $source->data()->set('permalink', $permalink);
 
-                        $slugs = explode('/', $slug);
-
-                        // @todo finish me!
-                        // Be careful of side effect when watching!
-                        // Perhaps tree loops required!?
-                        array(
-
-                            'accueil' => array(
-                                'title' => 'Accueil',
-                                'slug' => 'accueil',
-                                'items' => array(),
-                            ),
-                            'nouveaute' => array(
-                                'title' => 'Nouveauté',
-                                'slug' => 'nouveaute',
-                                'items' => array(
-
-                                    'foo' => array(
-                                        'title' => 'Foo',
-                                        'slug' => 'nouveaute/foo',
-                                        'items' => array(),
-                                    ),
-
-                                    'bar' => array(
-                                        'title' => 'Bar',
-                                        'slug' => 'nouveaute/bar',
-                                        'items' => array(),
-                                    ),
-                                ),
-                            ),
+                        // Initialize the items
+                        $items = array(
+                            'title' => $title,
+                            #'nav_name' => $this->getNavigationName($slug), // see if useful?
+                            'slug' => $slug,
+                            'items' => array(),
                         );
-                        $menu = array();
-//                        foreach ($slugs as $part) {
-//                            $menu = array('nav_name' => $part, $it)
-//                        }
+                        $currentPosition = 0;
 
-                        $menu = $this->feedMenu($slugs);
-                        $this->mergeMenu($menu);
-	                }
+                        // Build the menu structure
+                        $this->feedMenu($this->menu, $slug, $currentPosition, $items);
+                    }
                 }
             }
         }
 
-        // Second loop to set the menu
+        $this->setMenu($sourceSet);
+    }
+
+    /**
+     * Now that the menu structure has been created, inject it back to the page.
+     *
+     * @param SourceSet $sourceSet
+     * @return void
+     */
+    protected function setMenu(SourceSet $sourceSet)
+    {
+
+        // Second loop to set the menu which was initialized during the first loop
         foreach ($sourceSet->updatedSources() as $source) {
             /** @var \Sculpin\Core\Source\FileSource $source */
 
@@ -129,75 +115,91 @@ class PagesGenerator implements EventSubscriberInterface
             if ($source->canBeFormatted()) {
 
                 // Dynamically set the permalink.
-                $segments = explode('/', $source->relativePathname());
-                if (!empty($segments)) {
-                    $shifted = array_shift($segments);
+                $pathSegments = explode('/', $source->relativePathname());
+                if (!empty($pathSegments)) {
+                    $shifted = array_shift($pathSegments);
                     if ($shifted === '_pages') {
                         $source->data()->set('menu', $this->menu);
                     }
                 }
             }
         }
+
     }
 
     /**
-     * Feed the menu property
+     * Create a structure for the menu.
      *
-     * @param array $slugs
-     * @param array $menu
-     * @return array
-     */
-    protected function feedMenu(array $slugs, $menu = array())
-    {
-        if (count($slugs) === 1) {
-            $currentSlug = array_shift($slugs);
-            $menu = array('title' => $currentSlug, 'items' => $menu);
-        } else {
-            $currentSlug = array_shift($slugs);
-            $menu = array('title' => $currentSlug, 'items' => $this->feedMenu($slugs, $menu));
-        }
-        return $menu;
-    }
-
-    /**
-     * Merge the menu
+     * array(
+     *   'foo' => array(
+     *     'title' => 'Foo',
+     *     'slug' => 'foo',
+     *     'items' => array(
+     *       'bar' => array(
+     *         'title' => 'Bar',
+     *         'slug' => 'foo/bar',
+     *         'items' => array(),
+     *        ),
+     *      ),
+     *   ),
+     * );
      *
      * @param array $menu
-     * @return array
+     * @param string $slug
+     * @param int $currentPosition
+     * @param array $items
+     * @return void
      */
-    protected function mergeMenu($menu)
+    protected function feedMenu(array &$menu, $slug, $currentPosition = 0, array $items)
     {
-        if (empty($menu['items'])) {
-//            $position = array_search($menu['title'], $this->menu);
-//            if ($position === FALSE) {
-                $this->menu[] = $menu;
-//            } else {
-//
-//            }
+        // Explode the slug
+        $segments = explode('/', $slug);
+        $slugFirst = array_shift($segments);
+
+        if (empty($segments)) {
+
+            // The position is needed to tell apart the first level
+            if ($currentPosition > 0) {
+                $menu['items'][$slugFirst] = $items;
+            } else {
+                if (isset($menu[$slugFirst])) {
+
+                    // Only initialize the required value.
+                    $menu[$slugFirst]['title'] = $items['title'];
+                    $menu[$slugFirst]['nav_name'] = $items['nav_name'];
+                    $menu[$slugFirst]['slug'] = $items['slug'];
+                } else {
+                    // Here we can simply put the items as nothing has been yet intialized.
+                    $menu[$slugFirst] = $items;
+                }
+            }
         } else {
 
+            // Initialize array here.
+            // It happens Sculpin servers the children pages before the parents
+            // foo/bar.md -> "bar.md" is given first and "foo" must be initialized.
+            if (!isset($menu[$slugFirst])) {
+                $menu[$slugFirst] = array(
+                    'items' => array(),
+                );
+            }
 
-//            print_r($this->menu);
-//            print_r($menu);
-////            $this->mergeMenu($menu['items'])
-//            exit();
-
+            $remainingSlug = implode('/', $segments);
+            $currentPosition++;
+            $this->feedMenu($menu[$slugFirst], $remainingSlug, $currentPosition, $items); // recursion here.
         }
     }
 
-
     /**
-     * Return the "nav_name".
+     * Return the "nav_name". Simply take the last part of the slug.
      *
-     * @param array $segments
+     * @param string $slug
      * @return string
      */
-    protected function getNavigationName(array $segments)
+    protected function getNavigationName($slug)
     {
-        $poppedSegment = array_pop($segments);
-        $segment = $this->removePrefix($poppedSegment);
-        $info = pathinfo($segment);
-        return basename($segment, '.' . $info['extension']);
+        $slugSegments = explode('/', $slug);
+        return array_pop($slugSegments);
     }
 
     /**
@@ -251,25 +253,4 @@ class PagesGenerator implements EventSubscriberInterface
         return preg_replace('/^[0-9]{2}-/', '', $segment);
     }
 
-}
-function array_merge_recursive_new()
-{
-    $arrays = func_get_args();
-    $base = array_shift($arrays);
-
-    foreach ($arrays as $array) {
-        reset($base); //important
-        while (list($key, $value) = @each($array)) {
-            if (is_array($value) && @is_array($base[$key])) {
-                $base[$key] = array_merge_recursive_new($base[$key], $value);
-            } else {
-                if(isset($base[$key]) && is_int($key)) {
-                    $key++;
-                }
-                $base[$key] = $value;
-            }
-        }
-    }
-
-    return $base;
 }
