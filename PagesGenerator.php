@@ -77,7 +77,7 @@ class PagesGenerator implements EventSubscriberInterface
                         // Initialize the items
                         $items = array(
                             'title' => $title,
-                            #'nav_name' => $this->getNavigationName($slug), // see if useful?
+                            'nav_name' => $this->getNavigationName($slug),
                             'slug' => $slug,
                             'items' => array(),
                         );
