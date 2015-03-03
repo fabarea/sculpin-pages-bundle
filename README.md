@@ -6,9 +6,7 @@ Add this bundle in your ```sculpin.json``` file:
 
 ```json
 {
-    // ...
     "require": {
-        // ...
         "fab/sculpin-pages-bundle": "@dev"
     }
 }
